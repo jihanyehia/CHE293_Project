@@ -1,4 +1,3 @@
-import os
 import pathlib
 import pandas as pd
 from tkinter import Tk
@@ -7,45 +6,33 @@ from tkinter.filedialog import askopenfilename
 pd.set_option('display.max_columns', None)
 
 
-def process_hb2():
-    content = []
-
-    Tk().withdraw()
-    hb2_name = askopenfilename()
-    # Check if the file is a .hb2 file
-    if pathlib.Path(hb2_name).suffix == ".hb2":
-        with open(hb2_name, 'r') as hb2:
-            # fill each line as an element of the list "content"
-            content = hb2.readlines()
-            # Remove \n from the end of each line in the list
-            content = [line.strip() for line in content]
-    else:
-        print("The file is not in the right format (.hb2 file)")
+def process_hb2(hb2_content):
+    """Takes the hb2 file and processes it to separate the columns into a dataframe that resembles the file"""
 
     # Skip comments (line 0 to 7)
-    content = content[8:]
+    hb2_content = hb2_content[8:]
 
     # An example of an entry in .hb2 file, read top down for the column number in
     # Table 1 of https://www.ebi.ac.uk/thornton-srv/software/HBPLUS/manual.html
     #
     # 00000000011111111112222222222333333333344444444445555555555666666666677777777778
     # 12345678901234567890123456789012345678901234567890123456789012345678901234567890
-    # A0069-VAL N   A2001-HOH O   3.27 MH  -2 -1.00 163.8  2.28  -1.0  -1.0     1
+    # A0069-VAL N   A2001-SOL O   3.27 MH  -2 -1.00 163.8  2.28  -1.0  -1.0     1
     #
     # donor           :  A0069 (whitespace removed)
     # donor_amino     :  VAL   (whitespace removed)
     # donor_type      :  N     (whitespace removed)
     # acceptor        :  A2001 (whitespace removed)
-    # acceptor_amino  :  HOH   (whitespace removed)
+    # acceptor_amino  :  SOL   (whitespace removed)
     # acceptor_type   :  O     (whitespace removed)
     # da_dist         :  3.27
     # cat_da          :  MH    (whitespace removed)
     # ... so on, refer to Table 1 ...
 
-    donor, donor_amino, donor_type, acceptor, acceptor_amino, acceptor_type,\
-        da_dist, cat_da, num_aas, dist, dha_angle, ha_dist, h_a_aa_angle, d_a_aa_angle = ([] for _ in range(14))
+    donor, donor_amino, donor_type, acceptor, acceptor_amino, acceptor_type, \
+    da_dist, cat_da, num_aas, dist, dha_angle, ha_dist, h_a_aa_angle, d_a_aa_angle = ([] for _ in range(14))
 
-    for line in content:
+    for line in hb2_content:
         # Since python starts indexing at zero, the start index is always the start position -1
         # Since the last index is not included in a range of indices, we don't need to subtract 1 from the end position
         donor.append(line[0:5])
@@ -71,21 +58,43 @@ def process_hb2():
     hb2_dict = dict(zip(keys, values))
     hb2_df = pd.DataFrame(hb2_dict)
     # print(hb2_df[:5])
-
     return hb2_df
 
 
 def is_nucleotide(x):
+    """
+    Checks if the donor or acceptor amino is a nucleotide
+    based on Table II - List of Hydrogen Bond Donors and Acceptors
+    from HBPlus manual (https://www.ebi.ac.uk/thornton-srv/software/HBPLUS/manual.html)
+    """
     return x in ['A', 'C', 'T', 'U', 'G', 'ATP']  # Standard Nucleotides: C, A, U, G, T, also ATP
 
 
 def is_amino(x):
+    """
+    Checks if the donor or acceptor amino is an amino acid
+    based on Table II - List of Hydrogen Bond Donors and Acceptors
+    from HBPlus manual (https://www.ebi.ac.uk/thornton-srv/software/HBPLUS/manual.html)
+    """
     return x in ['ALA', 'ARG', 'ASN', 'ASP', 'ASX', 'CYS', 'GLU', 'GLN', 'GLX', 'GLY', 'HIS', 'ILE',
                  'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL']
 
 
-def find_water_bridges(hb2_df, double=False):
-    sol = hb2_df.loc[(result['donor_amino'] == 'SOL') | (hb2_df['acceptor_amino'] == 'SOL')]
+def find_bridges(entries, double=False):
+    """
+    Searches for single water bridges and double ones if the flag "double" is set to True
+    Picks from the processed hb2 file the rows that have "SOL" in their donor_amino or acceptor_amino columns
+    Divides each of these rows into pairs of nucleotide-SOL and amino-SOL, while taking into account whether the
+    nucleotide and amino acid are donors or acceptors
+    Identifies single water bridges as the formation of nucleotide -- SOL -- amino acid or vice versa
+    For double water bridges:
+    Picks from the processed hb2 file the rows that have "SOL" in both their donor_amino and acceptor_amino columns
+    Generates a pair of SOL-SOL and searches among them and the pairs of nucleotide-SOL and amino-SOL obtained above to
+    form the following nucleotide -- SOL -- SOL -- amino acid or vice versa, identified as double water bridges
+    """
+    hb2_df = process_hb2(entries)
+
+    sol = hb2_df.loc[(hb2_df['donor_amino'] == 'SOL') | (hb2_df['acceptor_amino'] == 'SOL')]
     # print(sol.head())
     # print(len(sol))
 
@@ -171,17 +180,30 @@ def find_water_bridges(hb2_df, double=False):
                             dwb.append([pair_nuc[1], sol_id_acc, sol_id_don, pair_amino[1], "acc - acc"])
 
         dwb_df = pd.DataFrame(dwb, columns=['Nucleo', 'Water', 'Water', 'A.acid', 'Bonding Type'])
-        dwb_df = dwb_df.shift()[1:]
 
         return swb_df, dwb_df
 
     return swb_df
 
-result = process_hb2()
-# print(result.head())
-# print(len(result))
 
-s_water, d_water = find_water_bridges(result, double=True)
-
-print(s_water)
-print(d_water)
+content = []
+# Browse for the desired input hb2 file
+Tk().withdraw()
+hb2_name = askopenfilename()
+# Check if the file is a .hb2 file
+print(pathlib.Path(hb2_name).stem)
+if pathlib.Path(hb2_name).suffix == ".hb2":
+    with open(hb2_name, 'r') as hb2:
+        # fill each line as an element of the list "content"
+        content = hb2.readlines()
+        # Remove \n from the end of each line in the list
+        content = [line.strip() for line in content]
+        # Search for single and double water bridges
+        s_water, d_water = find_bridges(content, double=True)
+        # Note: To look for single water bridges only: s_water = find_water_bridges(result)
+        print(s_water)
+        s_water.to_csv(pathlib.Path(hb2_name).stem + ".csv", index=False)
+        print(d_water)  # To be commented out if looking for single water bridges only
+        d_water.to_csv(pathlib.Path(hb2_name).stem + ".csv", mode="a", index=False)  # Same here
+else:
+    print("The file is not in the right format (.hb2 file)")
