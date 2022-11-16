@@ -1,7 +1,7 @@
 import pathlib
 import pandas as pd
 from tkinter import Tk
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilenames
 
 pd.set_option('display.max_columns', None)
 
@@ -186,24 +186,43 @@ def find_bridges(entries, double=False):
     return swb_df
 
 
-content = []
 # Browse for the desired input hb2 file
 Tk().withdraw()
-hb2_name = askopenfilename()
-# Check if the file is a .hb2 file
-print(pathlib.Path(hb2_name).stem)
-if pathlib.Path(hb2_name).suffix == ".hb2":
-    with open(hb2_name, 'r') as hb2:
-        # fill each line as an element of the list "content"
-        content = hb2.readlines()
-        # Remove \n from the end of each line in the list
-        content = [line.strip() for line in content]
-        # Search for single and double water bridges
-        s_water, d_water = find_bridges(content, double=True)
-        # Note: To look for single water bridges only: s_water = find_water_bridges(result)
-        print(s_water)
-        s_water.to_csv(pathlib.Path(hb2_name).stem + ".csv", index=False)
-        print(d_water)  # To be commented out if looking for single water bridges only
-        d_water.to_csv(pathlib.Path(hb2_name).stem + ".csv", mode="a", index=False)  # Same here
-else:
-    print("The file is not in the right format (.hb2 file)")
+hb2_files = askopenfilenames()
+
+# Ask user if they want to look for both single and double water bridges or single bridges only
+choice = input("Do you want to look for double water bridges in addition to single water bridges? [y/n]")
+# Create files to write the output to
+f_single = open("single_water_bridges.csv", "w")
+if choice == "y":
+    f_double = open("double_water_bridges.csv", "w")
+
+for hb2_name in hb2_files:
+    print(pathlib.Path(hb2_name).stem)
+    content = []
+    if pathlib.Path(hb2_name).suffix == ".hb2":  # Check if the file is a .hb2 file
+        with open(hb2_name, 'r') as hb2:
+            # fill each line as an element of the list "content"
+            content = hb2.readlines()
+            # Remove \n from the end of each line in the list
+            content = [line.strip() for line in content]
+            # Search for single and double water bridges
+            if choice == "y":
+                s_water, d_water = find_bridges(content, double=True)
+                # print(s_water)
+                f_single.write("\n" + pathlib.Path(hb2_name).stem + "\n")
+                s_water.to_csv(f_single, mode="a", index=False, lineterminator="\n")
+                # print(d_water)
+                f_double.write("\n" + pathlib.Path(hb2_name).stem + "\n")
+                d_water.to_csv(f_double, mode="a", index=False, lineterminator="\n")
+            else:
+                s_water = find_bridges(content, double=False)
+                # print(s_water)
+                f_single.write("\n" + pathlib.Path(hb2_name).stem + "\n")
+                s_water.to_csv(f_single, mode="a", index=False, lineterminator="\n")
+    else:
+        print("The file is not in the right format (.hb2 file)")
+
+f_single.close()
+if choice == "y":
+    f_double.close()
