@@ -211,15 +211,15 @@ for hb2_name in hb2_files:
                 s_water, d_water = find_bridges(content, double=True)
                 # print(s_water)
                 f_single.write("\n" + pathlib.Path(hb2_name).stem + "\n")
-                s_water.to_csv(f_single, mode="a", index=False, lineterminator="\n")
+                s_water.to_csv(f_single, mode="a", index=False, line_terminator="\n")
                 # print(d_water)
                 f_double.write("\n" + pathlib.Path(hb2_name).stem + "\n")
-                d_water.to_csv(f_double, mode="a", index=False, lineterminator="\n")
+                d_water.to_csv(f_double, mode="a", index=False, line_terminator="\n")
             else:
                 s_water = find_bridges(content, double=False)
                 # print(s_water)
                 f_single.write("\n" + pathlib.Path(hb2_name).stem + "\n")
-                s_water.to_csv(f_single, mode="a", index=False, lineterminator="\n")
+                s_water.to_csv(f_single, mode="a", index=False, line_terminator="\n")
     else:
         print("The file is not in the right format (.hb2 file)")
 
